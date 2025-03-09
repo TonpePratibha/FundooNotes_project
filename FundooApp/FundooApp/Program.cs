@@ -15,6 +15,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
+using StackExchange.Redis;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +39,56 @@ builder.Services.AddScoped<INotesBL, NotesBL>();
 builder.Services.AddScoped<ILabelRepository, LabelRepository>();
 builder.Services.AddScoped<ILabelBL, LabelBL>();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+/*
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole(); // Logs to console
+builder.Logging.AddDebug();   // L
+*/
+
+
+
+
+// Add Redis Cache
+
+
+
+/*
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    var redisConnection = builder.Configuration.GetConnectionString("Redis");
+    if (string.IsNullOrEmpty(redisConnection))
+    {
+        throw new InvalidOperationException("Redis connection string is missing.");
+    }
+
+    options.Configuration = redisConnection;
+    options.InstanceName = "FundooApp_";
+});
+*/
+// Register the connection multiplexer for advanced Redis usage
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis"))
+);
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = "localhost:6379"; // Change if Redis is running on a different port or host
+    options.InstanceName = "FundooApp_";
+});
+
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+
+
 
 
 // JWT Configuration
@@ -103,6 +156,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+app.UseCors("AllowAll");
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
@@ -115,7 +169,7 @@ if (app.Environment.IsDevelopment())
 
     } );
 }
-
+app.MapGet("/", () => "Redis is connected!");
 app.UseHttpsRedirection();
 
 app.UseAuthentication(); 
